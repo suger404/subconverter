@@ -43,11 +43,18 @@ RUN if [ -n "$SHA" ]; then \
         sed -i 's/\(v[0-9]\.[0-9]\.[0-9]\)/\1-'"$SHA"'/' src/version.h || (echo "Failed to update version" && exit 1); \
     fi
 
-# 安装 Python 依赖
-RUN pip install gitpython || (echo "Failed to install gitpython" && exit 1)
+# 升级 pip 并安装 Python 依赖
+RUN pip install --upgrade pip
+RUN pip install gitpython requests || (echo "Failed to install Python dependencies" && exit 1)
 
-# 更新规则
-RUN python3 scripts/update_rules.py -c scripts/rules_config.conf || (echo "Failed to update rules" && exit 1)
+# 更新规则，增加详细输出和重试逻辑
+RUN python3 -c "import sys; print(sys.version)" && \
+    python3 -c "import gitpython, requests; print('GitPython version:', gitpython.__version__, '\nRequests version:', requests.__version__)" && \
+    for i in 1 2 3; do \
+        python3 scripts/update_rules.py -c scripts/rules_config.conf && break || \
+        echo "Attempt $i failed. Retrying in 5 seconds..." && \
+        sleep 5; \
+    done || (echo "Failed to update rules after 3 attempts" && exit 1)
 
 # 构建 subconverter
 RUN cmake -DCMAKE_BUILD_TYPE=Release . || (echo "CMake configuration failed" && exit 1)
