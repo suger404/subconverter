@@ -53,14 +53,13 @@ RUN if [ -n "$SHA" ]; then \
 RUN pip install --upgrade pip
 RUN pip install gitpython requests || (echo "Failed to install Python dependencies" && exit 1)
 
-# 更新规则，增加详细输出和重试逻辑
-RUN python3 -c "import sys; print(sys.version)" && \
-    python3 -c "import gitpython, requests; print('GitPython version:', gitpython.__version__, '\nRequests version:', requests.__version__)" && \
-    for i in 1 2 3 4 5; do \
-        GIT_TERMINAL_PROMPT=0 python3 scripts/update_rules.py -c scripts/rules_config.conf && break || \
-        echo "Attempt $i failed. Retrying in 10 seconds..." && \
-        sleep 10; \
-    done || (echo "Failed to update rules after 5 attempts" && exit 1)
+# 暂时注释掉更新规则的步骤
+# RUN for i in 1 2 3 4 5; do \
+#     GIT_TERMINAL_PROMPT=0 python3 scripts/update_rules.py -c scripts/rules_config.conf && break || \
+#     echo "Attempt $i failed. Retrying in 10 seconds..." && \
+#     sleep 10; \
+# done || (echo "Failed to update rules after 5 attempts" && exit 1)
+
 
 # 构建 subconverter
 RUN cmake -DCMAKE_BUILD_TYPE=Release . || (echo "CMake configuration failed" && exit 1)
