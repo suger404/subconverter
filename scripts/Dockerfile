@@ -3,12 +3,15 @@ LABEL maintainer="tindy.it@gmail.com"
 ARG THREADS="4"
 ARG SHA=""
 
+# 首先安装 Git
+RUN apk add --no-cache git
+
 # 设置 Git 配置
 RUN git config --global url."https://".insteadOf git://
 
-# 安装构建工具和依赖
-RUN apk add --no-cache --virtual .build-tools git g++ build-base linux-headers cmake python3 && \
-    apk add --no-cache --virtual .build-deps curl-dev rapidjson-dev pcre2-dev yaml-cpp-dev
+# 安装其他构建工具和依赖
+RUN apk add --no-cache g++ build-base linux-headers cmake python3 \
+    curl-dev rapidjson-dev pcre2-dev yaml-cpp-dev
 
 # 构建 quickjspp
 WORKDIR /tmp
