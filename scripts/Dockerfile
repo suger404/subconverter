@@ -3,15 +3,12 @@ LABEL maintainer="tindy.it@gmail.com"
 ARG THREADS="4"
 ARG SHA=""
 
-# 首先安装 Git
-RUN apk add --no-cache git
+# 安装所有必要的工具和依赖
+RUN apk add --no-cache git g++ build-base linux-headers cmake python3 py3-pip \
+    curl-dev rapidjson-dev pcre2-dev yaml-cpp-dev
 
 # 设置 Git 配置
 RUN git config --global url."https://".insteadOf git://
-
-# 安装其他构建工具和依赖
-RUN apk add --no-cache g++ build-base linux-headers cmake python3 \
-    curl-dev rapidjson-dev pcre2-dev yaml-cpp-dev
 
 # 构建 quickjspp
 WORKDIR /tmp
@@ -36,15 +33,25 @@ RUN git clone https://github.com/ToruNiina/toml11 --branch="v3.7.1" --depth=1 &&
     cmake -DCMAKE_CXX_STANDARD=11 . && \
     make install -j $THREADS
 
+# 克隆 subconverter
+WORKDIR /tmp
+RUN git clone https://github.com/tindy2013/subconverter --depth=1 || (echo "Failed to clone subconverter" && exit 1)
+
+# 进入 subconverter 目录并更新版本（如果需要）
+WORKDIR /tmp/subconverter
+RUN if [ -n "$SHA" ]; then \
+        sed -i 's/\(v[0-9]\.[0-9]\.[0-9]\)/\1-'"$SHA"'/' src/version.h || (echo "Failed to update version" && exit 1); \
+    fi
+
+# 安装 Python 依赖
+RUN pip install gitpython || (echo "Failed to install gitpython" && exit 1)
+
+# 更新规则
+RUN python3 scripts/update_rules.py -c scripts/rules_config.conf || (echo "Failed to update rules" && exit 1)
+
 # 构建 subconverter
-RUN git clone https://github.com/tindy2013/subconverter --depth=1 && \
-    cd subconverter && \
-    [ -n "$SHA" ] && sed -i 's/\(v[0-9]\.[0-9]\.[0-9]\)/\1-'"$SHA"'/' src/version.h && \
-    python3 -m ensurepip && \
-    python3 -m pip install gitpython && \
-    python3 scripts/update_rules.py -c scripts/rules_config.conf && \
-    cmake -DCMAKE_BUILD_TYPE=Release . && \
-    make -j $THREADS
+RUN cmake -DCMAKE_BUILD_TYPE=Release . || (echo "CMake configuration failed" && exit 1)
+RUN make -j $THREADS || (echo "Make failed" && exit 1)
 
 # 构建最终镜像
 FROM alpine:3.16
