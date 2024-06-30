@@ -8,7 +8,9 @@ RUN apk add --no-cache git g++ build-base linux-headers cmake python3 py3-pip \
     curl-dev rapidjson-dev pcre2-dev yaml-cpp-dev
 
 # 设置 Git 配置
-RUN git config --global url."https://".insteadOf git://
+RUN git config --global url."https://".insteadOf git:// && \
+    git config --global http.lowSpeedLimit 1000 && \
+    git config --global http.lowSpeedTime 60
 
 # 构建 quickjspp
 WORKDIR /tmp
@@ -35,7 +37,11 @@ RUN git clone https://github.com/ToruNiina/toml11 --branch="v3.7.1" --depth=1 &&
 
 # 克隆 subconverter
 WORKDIR /tmp
-RUN git clone https://github.com/tindy2013/subconverter --depth=1 || (echo "Failed to clone subconverter" && exit 1)
+RUN for i in 1 2 3; do \
+        git clone https://github.com/tindy2013/subconverter --depth=1 && break || \
+        echo "Attempt $i failed. Retrying in 5 seconds..." && \
+        sleep 5; \
+    done || (echo "Failed to clone subconverter after 3 attempts" && exit 1)
 
 # 进入 subconverter 目录并更新版本（如果需要）
 WORKDIR /tmp/subconverter
@@ -50,11 +56,11 @@ RUN pip install gitpython requests || (echo "Failed to install Python dependenci
 # 更新规则，增加详细输出和重试逻辑
 RUN python3 -c "import sys; print(sys.version)" && \
     python3 -c "import gitpython, requests; print('GitPython version:', gitpython.__version__, '\nRequests version:', requests.__version__)" && \
-    for i in 1 2 3; do \
-        python3 scripts/update_rules.py -c scripts/rules_config.conf && break || \
-        echo "Attempt $i failed. Retrying in 5 seconds..." && \
-        sleep 5; \
-    done || (echo "Failed to update rules after 3 attempts" && exit 1)
+    for i in 1 2 3 4 5; do \
+        GIT_TERMINAL_PROMPT=0 python3 scripts/update_rules.py -c scripts/rules_config.conf && break || \
+        echo "Attempt $i failed. Retrying in 10 seconds..." && \
+        sleep 10; \
+    done || (echo "Failed to update rules after 5 attempts" && exit 1)
 
 # 构建 subconverter
 RUN cmake -DCMAKE_BUILD_TYPE=Release . || (echo "CMake configuration failed" && exit 1)
